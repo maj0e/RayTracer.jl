@@ -4,6 +4,7 @@ import Base.findmax
 import Base.push!
 
 using Zygote: @adjoint, @nograd
+using ChainRulesCore: rrule
 
 import Zygote.literal_getproperty
 
@@ -12,7 +13,9 @@ import Zygote.literal_getproperty
 # ---- #
 
 # Hack to avoid nothing in the gradient due to typemax
-@adjoint bigmul(x::T) where {T} = bigmul(x), Δ -> (zero(T),)
+function ChainRulesCore.rrule(::typeof(bigmul), x::T) where {T}
+    return bigmul(x), Δ -> (zero(T),)
+end 
 
 @adjoint Vec3(a, b, c) = Vec3(a, b, c), Δ -> (Δ.x, Δ.y, Δ.z)
 
@@ -42,7 +45,7 @@ end
     
 # The purpose of this adjoint is to ensure type inference works
 # in the backward pass
-@adjoint function cross(a::Vec3{T}, b::Vec3{T}) where {T}
+ChainRulesCore.rrule(::typeof(cross), a::Vec3{T}, b::Vec3{T}) where {T}
     cross(a, b), Δ -> begin
         ∇a = zero(a)
         ∇b = zero(b)
@@ -71,7 +74,6 @@ end
             ∇b.z .= z
         end
         return (∇a, ∇b)
-    end
 end
 
 @adjoint place(a::Vec3, cond) = place(a, cond), Δ -> (Vec3(Δ.x[cond], Δ.y[cond], Δ.z[cond]), nothing)
